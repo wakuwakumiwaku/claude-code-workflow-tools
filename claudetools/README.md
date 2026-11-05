@@ -127,6 +127,10 @@ $sendqueue  # runs step3
 
 **Storage:** `~/.claude/queue-order.txt` + `~/.claude/pending-prompts/`
 
+Queue names must be unused in the shared pending-prompt storage. If a name
+already exists, `$queue` leaves the saved prompt and queue order unchanged;
+choose another name instead of overwriting an unexecuted task.
+
 ---
 
 ## Statusline

@@ -53,7 +53,14 @@ if [[ "$prompt" =~ ^\$queue[[:space:]] ]]; then
 
     # Save prompt (shared storage with pending)
     mkdir -p ~/.claude/pending-prompts
-    echo "$content" > ~/.claude/pending-prompts/"$name".txt
+    # Pending and queued prompts share names. Never overwrite an existing task
+    # or append a second queue entry pointing at the same soon-deleted file.
+    # noclobber also protects against another hook creating the file first.
+    if ! (set -o noclobber; printf '%s\n' "$content" > "$HOME/.claude/pending-prompts/$name.txt") 2>/dev/null; then
+        reason=$(printf "Prompt '%s' already exists or could not be saved. Choose a new name. Queue unchanged." "$name" | jq -Rs '.')
+        echo "{\"decision\":\"block\",\"reason\":$reason}"
+        exit 0
+    fi
 
     # Add to queue order
     echo "$name" >> ~/.claude/queue-order.txt
