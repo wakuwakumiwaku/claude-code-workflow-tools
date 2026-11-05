@@ -56,12 +56,13 @@ get_token_counts() {
     fi
 
     # Sum tokens from ALL session files (main + agent files)
-    python3 << EOF
+    python3 - "$SESSION_DIR" << 'EOF'
 import json
 import glob
 import os
+import sys
 
-session_dir = "$SESSION_DIR"
+session_dir = sys.argv[1]
 input_tokens = 0
 output_tokens = 0
 
@@ -101,15 +102,21 @@ case "$1" in
         START_INPUT=$(echo $TOKENS | cut -d' ' -f1)
         START_OUTPUT=$(echo $TOKENS | cut -d' ' -f2)
 
-        cat > "$CURRENT_TIMER" << EOF
-{
-    "name": "$NAME",
-    "start_time": $TIMESTAMP,
-    "start_date": "$DATE",
-    "cwd": "$CWD",
-    "start_input_tokens": $START_INPUT,
-    "start_output_tokens": $START_OUTPUT
-}
+        # Pass user-controlled values as data, never Python or JSON source.
+        python3 - "$NAME" "$TIMESTAMP" "$DATE" "$CWD" "$START_INPUT" "$START_OUTPUT" > "$CURRENT_TIMER" << 'EOF' || exit 1
+import json
+import sys
+
+name, timestamp, date, cwd, input_tokens, output_tokens = sys.argv[1:]
+json.dump({
+    "name": name,
+    "start_time": int(timestamp),
+    "start_date": date,
+    "cwd": cwd,
+    "start_input_tokens": int(input_tokens),
+    "start_output_tokens": int(output_tokens),
+}, sys.stdout)
+sys.stdout.write("\n")
 EOF
         echo "=================================================="
         echo "Timer started: $NAME"
@@ -130,12 +137,12 @@ EOF
 
         # Read current timer
         TIMER_DATA=$(cat "$CURRENT_TIMER")
-        START_TIMESTAMP=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_time'])")
-        NAME=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
-        START_DATE=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_date'])")
-        CWD=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['cwd'])")
-        START_INPUT=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_input_tokens', 0))")
-        START_OUTPUT=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_output_tokens', 0))")
+        START_TIMESTAMP=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_time'])")
+        NAME=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
+        START_DATE=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_date'])")
+        CWD=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['cwd'])")
+        START_INPUT=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_input_tokens', 0))")
+        START_OUTPUT=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_output_tokens', 0))")
 
         # Get ending token counts
         TOKENS=$(get_token_counts "$CWD")
@@ -153,7 +160,27 @@ EOF
         COST=$(python3 -c "print(f'{($INPUT_DELTA / 1_000_000) * 15 + ($OUTPUT_DELTA / 1_000_000) * 75:.4f}')")
 
         # Save to history
-        echo "{\"name\": \"$NAME\", \"start\": \"$START_DATE\", \"end\": \"$END_DATE\", \"duration_seconds\": $DURATION, \"duration_formatted\": \"$FORMATTED\", \"cwd\": \"$CWD\", \"input_tokens\": $INPUT_DELTA, \"output_tokens\": $OUTPUT_DELTA, \"total_tokens\": $TOTAL_DELTA, \"cost_usd\": $COST}" >> "$HISTORY_FILE"
+        python3 - "$CURRENT_TIMER" "$END_DATE" "$DURATION" "$FORMATTED" "$INPUT_DELTA" "$OUTPUT_DELTA" "$TOTAL_DELTA" "$COST" >> "$HISTORY_FILE" << 'EOF' || exit 1
+import json
+import sys
+
+current_path, end, duration, formatted, input_tokens, output_tokens, total_tokens, cost = sys.argv[1:]
+with open(current_path, encoding="utf-8") as f:
+    current = json.load(f)
+json.dump({
+    "name": current["name"],
+    "start": current["start_date"],
+    "end": end,
+    "duration_seconds": int(duration),
+    "duration_formatted": formatted,
+    "cwd": current["cwd"],
+    "input_tokens": int(input_tokens),
+    "output_tokens": int(output_tokens),
+    "total_tokens": int(total_tokens),
+    "cost_usd": float(cost),
+}, sys.stdout)
+sys.stdout.write("\n")
+EOF
 
         # Remove current timer
         rm "$CURRENT_TIMER"
@@ -184,12 +211,12 @@ EOF
 
         NOW=$(get_timestamp)
         TIMER_DATA=$(cat "$CURRENT_TIMER")
-        START_TIMESTAMP=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_time'])")
-        NAME=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
-        START_DATE=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_date'])")
-        CWD=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['cwd'])")
-        START_INPUT=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_input_tokens', 0))")
-        START_OUTPUT=$(echo "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_output_tokens', 0))")
+        START_TIMESTAMP=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_time'])")
+        NAME=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
+        START_DATE=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['start_date'])")
+        CWD=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin)['cwd'])")
+        START_INPUT=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_input_tokens', 0))")
+        START_OUTPUT=$(printf '%s\n' "$TIMER_DATA" | python3 -c "import json,sys; print(json.load(sys.stdin).get('start_output_tokens', 0))")
 
         ELAPSED=$((NOW - START_TIMESTAMP))
         FORMATTED=$(format_duration $ELAPSED)
@@ -222,10 +249,11 @@ EOF
         echo "=================================================="
         echo "TIMER HISTORY"
         echo "=================================================="
-        python3 << EOF
+        python3 - "$HISTORY_FILE" << 'EOF'
 import json
+import sys
 
-with open("$HISTORY_FILE", "r") as f:
+with open(sys.argv[1], "r", encoding="utf-8") as f:
     entries = [json.loads(line) for line in f if line.strip()]
 
 if not entries:
@@ -235,7 +263,7 @@ else:
         print(f"{i}. {entry['name']}")
         print(f"   Duration: {entry['duration_formatted']}")
         print(f"   Tokens: {entry.get('total_tokens', 'N/A')} (in: {entry.get('input_tokens', 'N/A')}, out: {entry.get('output_tokens', 'N/A')})")
-        print(f"   Cost: \${entry.get('cost_usd', 'N/A')}")
+        print(f"   Cost: ${entry.get('cost_usd', 'N/A')}")
         print(f"   Time: {entry['start']} → {entry['end']}")
         print()
 EOF

@@ -237,3 +237,21 @@ Should return valid JSON.
 - **Hot reload:** As of v1.0.90+, settings.json changes auto-reload. Hook script changes always take effect immediately.
 - **Dependencies:** `jq` and `bc` required for hooks and statusline
 - **Cross-platform:** Works on macOS and Linux (auto-detects OS for platform-specific commands)
+
+## Session timer
+
+Use `bash commands/timer.sh start "name"`, `status`, `stop`, and `list` to track
+elapsed time and token deltas. Timer names and project/home paths are passed to
+Python as literal data; quotes, backslashes, and embedded newlines are escaped
+when written to `~/.claude/timers/current.json` and `history.jsonl`.
+
+The timer regression tests require Bash and Python 3 only. They use temporary
+homes and synthetic session records, without reading your Claude sessions:
+
+```sh
+python -B -m unittest discover -s tests -v
+bash -n claudetools/commands/timer.sh
+```
+
+Run those commands from the repository root. Live Claude hooks and macOS UI
+integrations are not exercised by this suite.
