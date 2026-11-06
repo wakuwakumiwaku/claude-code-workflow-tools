@@ -125,6 +125,10 @@ $sendqueue  # runs step2
 $sendqueue  # runs step3
 ```
 
+`$sendqueue` must be a complete command token (end of prompt or followed by
+whitespace). Other prefixes such as `$sendqueue-status` pass through without
+consuming or blocking queued work.
+
 **Storage:** `~/.claude/queue-order.txt` + `~/.claude/pending-prompts/`
 
 Queue names must be unused in the shared pending-prompt storage. If a name

@@ -4,7 +4,7 @@
 input=$(cat)
 prompt=$(echo "$input" | jq -r '.prompt')
 
-if [[ "$prompt" =~ ^\$sendqueue ]]; then
+if [[ "$prompt" =~ ^\$sendqueue([[:space:]]|$) ]]; then
     queue_file="$HOME/.claude/queue-order.txt"
 
     # Check if queue exists and has items
