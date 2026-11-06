@@ -106,26 +106,28 @@ if [[ "$prompt" =~ ^\$cc-resume[[:space:]] ]]; then
     fi
 
     # Build context for Claude
-    context="# Resume from Checkpoint: $name\n\n"
+    printf -v context '# Resume from Checkpoint: %s\n\n' "$name"
 
     # Add metadata if available
     if [ -f "$meta_file" ]; then
         created=$(jq -r '.created' "$meta_file" 2>/dev/null | cut -d'T' -f1)
         project=$(jq -r '.project_path' "$meta_file" 2>/dev/null)
-        context+="**Created:** $created\n**Project:** $project\n\n"
+        printf -v metadata_context '**Created:** %s\n**Project:** %s\n\n' "$created" "$project"
+        context+="$metadata_context"
     fi
 
     # If summary exists, use it; otherwise inject raw checkpoint
     if [ -f "$summary_file" ]; then
         summary_content=$(cat "$summary_file")
-        context+="## Checkpoint Summary\n\n$summary_content\n\n"
-        context+="---\n\n**Instructions:** Review this checkpoint summary and ask the user how they'd like to proceed."
-        escaped_context=$(echo -e "$context" | jq -Rs '.')
+        printf -v summary_context '## Checkpoint Summary\n\n%s\n\n' "$summary_content"
+        context+="$summary_context"
+        context+=$'---\n\n**Instructions:** Review this checkpoint summary and ask the user how they\'d like to proceed.'
+        escaped_context=$(printf '%s\n' "$context" | jq -Rs '.')
     else
         # No summary - inject the raw checkpoint data
-        context+="## Raw Checkpoint Data\n\n"
-        context+="Below is the MOST RECENT conversation data from this checkpoint (JSONL format, newest first). Parse it to understand what was being worked on and ask how to proceed.\n\n"
-        context+="---\n\n"
+        context+=$'## Raw Checkpoint Data\n\n'
+        context+=$'Below is the MOST RECENT conversation data from this checkpoint (JSONL format, newest first). Parse it to understand what was being worked on and ask how to proceed.\n\n'
+        context+=$'---\n\n'
 
         # Read raw jsonl - filter to just user/assistant messages
         # Reverse order so most recent context comes first (most relevant for resuming)
@@ -139,7 +141,7 @@ if [[ "$prompt" =~ ^\$cc-resume[[:space:]] ]]; then
 
         # Combine and escape for JSON
         full_context="${context}${raw_data}"
-        escaped_context=$(echo "$full_context" | jq -Rs '.')
+        escaped_context=$(printf '%s\n' "$full_context" | jq -Rs '.')
     fi
 
     echo "{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":$escaped_context}}"
